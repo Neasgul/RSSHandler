@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">RSSHandler</string>
+    <string name="title_activity_main">MainActivity</string>
+    <string name="image_precedente">image precedente</string>
+    <string name="image_suivante">image suivante</string>
+    <string name="test_image_date">date image</string>
+    <string name="test_image_title">titre image</string>
+    <string name="image_description">description image</string>
+</resources>
