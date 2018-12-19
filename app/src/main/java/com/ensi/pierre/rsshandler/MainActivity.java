@@ -23,7 +23,7 @@ public class MainActivity extends AppCompatActivity {
         handler.setUrl("http://www.nasa.gov/rss/dyn/image_of_the_day.rss");
         Toast.makeText(this,"chargement image :"+handler.getNumItem(), Toast.LENGTH_LONG).show();
 
-        new DownloadRSSTask(this).execute(handler);
+        new DownloadRSSTask(this, 0).execute(handler);
 
     }
 
@@ -38,22 +38,23 @@ public class MainActivity extends AppCompatActivity {
     public class DownloadRSSTask extends AsyncTask<MyRSSsaxHandler,Void,MyRSSsaxHandler> {
 
         private MainActivity activity;
-        public DownloadRSSTask(MainActivity activity) {
+        private int item;
+        public DownloadRSSTask(MainActivity activity, int item) {
             this.activity = activity;
+            this.item = item;
         }
 
         @Override
         protected MyRSSsaxHandler doInBackground(MyRSSsaxHandler... myRSSsaxHandlers) {
-            myRSSsaxHandlers[0].processFeed();
+            myRSSsaxHandlers[0].processFeed(item);
             return myRSSsaxHandlers[0];
         }
 
         @Override
         protected void onPostExecute(MyRSSsaxHandler myRSSsaxHandler) {
-            activity.setRSSField(myRSSsaxHandler.getTitle(),
-                    myRSSsaxHandler.getDate(),
-                    myRSSsaxHandler.getDescription(),
-                    myRSSsaxHandler.getImage());
+            Bitmap image = myRSSsaxHandler.getImage();
+            RssItem item = myRSSsaxHandler.itemList.get(this.item);
+            activity.setRSSField(item.getTitle().toString(),item.getDate().toString(),item.getDescription().toString(),image);
         }
     }
 }

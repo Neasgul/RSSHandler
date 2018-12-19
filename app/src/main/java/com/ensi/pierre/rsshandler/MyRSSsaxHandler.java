@@ -5,6 +5,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.util.Log;
 
+import com.squareup.picasso.OkHttp3Downloader;
 import com.squareup.picasso.Picasso;
 
 import org.xml.sax.Attributes;
@@ -13,12 +14,13 @@ import org.xml.sax.SAXException;
 import org.xml.sax.XMLReader;
 import org.xml.sax.helpers.DefaultHandler;
 
-import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
@@ -32,10 +34,9 @@ public class MyRSSsaxHandler extends DefaultHandler {
     private boolean inItem = false ;
     private boolean inDate = false ;
     private Bitmap image = null ;
-    private String imageURL = null ;
-    private StringBuffer title = new StringBuffer();
-    private StringBuffer description = new StringBuffer();
-    private StringBuffer date = new StringBuffer();
+    List<RssItem> itemList= new ArrayList<>();
+    RssItem currentItem;
+
     private int numItem = 0;
     private int numItemMax = -1;
     private String TAG = "RSSHandler";
@@ -49,15 +50,18 @@ public class MyRSSsaxHandler extends DefaultHandler {
         this.url = url;
     }
 
-    public void processFeed() {
+    public void processFeed(int rssItem) {
         try {
+            numItem = rssItem;
             SAXParserFactory factory = SAXParserFactory.newInstance();
             SAXParser parser = factory.newSAXParser();
             XMLReader reader = parser.getXMLReader();
             reader.setContentHandler(this);
             InputStream inputStream = new URL(url).openStream();
             reader.parse(new InputSource(inputStream));
-            image = Picasso.with(context).load(imageURL).get();
+            Log.d(TAG, "startElement: "+itemList.get(numItem).getImageURL());
+
+            image = getPicasso().load(itemList.get(numItem).getImageURL()).get();
             numItemMax = numItem;
 
 
@@ -74,8 +78,10 @@ public class MyRSSsaxHandler extends DefaultHandler {
     }
     @Override
     public void startElement(String uri, String localName, String qName, Attributes attributes) throws SAXException {
-        Log.d(TAG, "startElement: "+qName + ", "+ attributes.getLength());
         switch (qName) {
+            case "item":
+                currentItem = new RssItem();
+                break;
             case "title":
                 inTitle = true;
                 break;
@@ -86,16 +92,17 @@ public class MyRSSsaxHandler extends DefaultHandler {
                 inDate = true;
                 break;
             case "enclosure":
-                imageURL = attributes.getValue("url");
-                inItem = true;
+                currentItem.setImageURL(attributes.getValue("url"));
                 break;
         }
     }
 
     @Override
     public void endElement(String uri, String localName, String qName) throws SAXException {
-        Log.d(TAG, "endElement: "+qName);
         switch (qName) {
+            case "item" :
+                itemList.add(currentItem);
+                currentItem = null;
             case "title":
                 inTitle = false;
                 break;
@@ -106,7 +113,6 @@ public class MyRSSsaxHandler extends DefaultHandler {
                 inDate = false;
                 break;
             case "enclosure":
-                inItem = false;
                 break;
         }
     }
@@ -114,52 +120,46 @@ public class MyRSSsaxHandler extends DefaultHandler {
     @Override
     public void characters(char ch[], int start, int length){
         String chars = new String(ch).substring(start,start+length);
-        if (inTitle) {
-            title = new StringBuffer(chars);
+        if (inTitle && currentItem!=null) {
+            currentItem.setTitle(new StringBuffer(chars));
         }
-        if (inDescription) {
-            description = new StringBuffer(chars);
+        if (inDescription  && currentItem!=null) {
+            currentItem.setDescription(new StringBuffer(chars));
         }
-        if (inDate) {
-            date = new StringBuffer(chars);
+        if (inDate && currentItem!=null) {
+            currentItem.setDate(new StringBuffer(chars));
         }
 
     }
 
     private Bitmap getBitmap(String imageURL) {
-
         try {
             URL url = new URL(imageURL);
-            InputStream is = url.openStream();
-            BufferedInputStream buf = new BufferedInputStream(is, 1024);
-            BitmapFactory.Options options=new BitmapFactory.Options();
-            options.inJustDecodeBounds = true;
-            Bitmap bitmap = BitmapFactory.decodeStream(buf,null,options);
-            return bitmap;
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setDoInput(true);
+            connection.setFollowRedirects(true);
+            connection.connect();
+            InputStream input = connection.getInputStream();
+            Bitmap myBitmap = BitmapFactory.decodeStream(input);
+            return myBitmap;
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.e(TAG, "getBitmap: ", e);
+            return null;
         }
-        return null;
     }
 
+    public int getNumItem() {
+        return numItem;
+    }
 
     public Bitmap getImage() {
         return image;
     }
 
-    public String getTitle() {
-        return title.toString();
-    }
 
-    public String getDescription() {
-        return description.toString();
-    }
-
-    public String getDate() {
-        return date.toString();
-    }
-
-    public int getNumItem() {
-        return numItem;
+    Picasso getPicasso() {
+        Picasso.Builder builder = new Picasso.Builder(context);
+        builder.downloader(new OkHttp3Downloader(context));
+        return builder.build();
     }
 }
